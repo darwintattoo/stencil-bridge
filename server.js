@@ -4,7 +4,7 @@ const Database = require('better-sqlite3');
 require('dotenv').config();
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -16,8 +16,12 @@ db.exec(`
   )
 `);
 
-const LORA_URL = 'https://v3b.fal.media/files/b/0a919f3f/3sH9dV22IiRUQAaoQyP55_pytorch_lora_weights.safetensors';
-const PROMPT = 'Convert this image into a clean black and white tattoo stencil line art. Use bold, precise outlines with fine detail preservation. Style: fluxdarwinupc';
+const LORA_URL =
+  'https://v3b.fal.media/files/b/0a919f3f/3sH9dV22IiRUQAaoQyP55_pytorch_lora_weights.safetensors';
+
+const PROMPT =
+  'Convert this image into a clean black and white tattoo stencil line art. Use bold, precise outlines with fine detail preservation. Style: fluxdarwinupc';
+
 const LIMIT = 2;
 const SITE_URL = 'https://stencil.tattoostencilpro.app';
 const MANYCHAT_API_URL = 'https://api.manychat.com/fb/sending/sendContent';
@@ -28,7 +32,8 @@ const MESSAGES = {
     remaining: (n) => `Aqui esta tu stencil. Te queda ${n} generacion gratuita.`,
     last: 'Aqui esta tu stencil. Has usado tus 2 generaciones gratuitas.',
     upsell: 'Para generar ilimitados registrate aqui, es gratis para empezar:',
-    blocked: 'Ya usaste tus 2 stencils gratuitos. Para generar ilimitados registrate en nuestra plataforma, es rapido y gratis para empezar.',
+    blocked:
+      'Ya usaste tus 2 stencils gratuitos. Para generar ilimitados registrate en nuestra plataforma, es rapido y gratis para empezar.',
     error: 'Hubo un problema procesando tu imagen. Intentalo de nuevo con otra foto.',
   },
   en: {
@@ -36,7 +41,8 @@ const MESSAGES = {
     remaining: (n) => `Here is your stencil. You have ${n} free generation left.`,
     last: 'Here is your stencil. You have used your 2 free generations.',
     upsell: "To generate unlimited stencils, sign up here — it's free to get started:",
-    blocked: "You have used your 2 free stencils. Sign up on our platform to generate unlimited ones — it's free to get started.",
+    blocked:
+      "You have used your 2 free stencils. Sign up on our platform to generate unlimited ones — it's free to get started.",
     error: 'There was a problem processing your image. Please try again with another photo.',
   },
   pt: {
@@ -44,7 +50,8 @@ const MESSAGES = {
     remaining: (n) => `Aqui esta o seu stencil. Voce tem ${n} geracao gratuita restante.`,
     last: 'Aqui esta o seu stencil. Voce usou suas 2 geracoes gratuitas.',
     upsell: 'Para gerar ilimitados, cadastre-se aqui — e gratis para comecar:',
-    blocked: 'Voce ja usou seus 2 stencils gratuitos. Cadastre-se para gerar ilimitados — e gratis para comecar.',
+    blocked:
+      'Voce ja usou seus 2 stencils gratuitos. Cadastre-se para gerar ilimitados — e gratis para comecar.',
     error: 'Houve um problema ao processar sua imagem. Tente novamente com outra foto.',
   },
   fr: {
@@ -52,7 +59,8 @@ const MESSAGES = {
     remaining: (n) => `Voici votre stencil. Il vous reste ${n} generation gratuite.`,
     last: 'Voici votre stencil. Vous avez utilise vos 2 generations gratuites.',
     upsell: "Pour generer des stencils illimites, inscrivez-vous ici — c'est gratuit :",
-    blocked: "Vous avez utilise vos 2 stencils gratuits. Inscrivez-vous pour en generer a l'infini — c'est gratuit.",
+    blocked:
+      "Vous avez utilise vos 2 stencils gratuits. Inscrivez-vous pour en generer a l'infini — c'est gratuit.",
     error: 'Une erreur sest produite. Veuillez reessayer avec une autre photo.',
   },
 };
@@ -64,7 +72,7 @@ function getLang(locale) {
 }
 
 function getCount(userId) {
-  const row = db.prepare('SELECT count FROM users WHERE user_id = ?').get(userId);
+  const row = db.prepare('SELECT count FROM users WHERE user_id = ?').get(String(userId));
   return row ? row.count : 0;
 }
 
@@ -72,7 +80,7 @@ function increment(userId) {
   db.prepare(`
     INSERT INTO users (user_id, count) VALUES (?, 1)
     ON CONFLICT(user_id) DO UPDATE SET count = count + 1
-  `).run(userId);
+  `).run(String(userId));
 }
 
 async function sendManychatContent(subscriberId, data) {
@@ -80,26 +88,32 @@ async function sendManychatContent(subscriberId, data) {
     throw new Error('Falta MANYCHAT_API_KEY en Railway');
   }
 
+  const payload = {
+    subscriber_id: Number(subscriberId),
+    data,
+  };
+
+  console.log('Enviando a ManyChat payload:', JSON.stringify(payload, null, 2));
+
   const response = await fetch(MANYCHAT_API_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${process.env.MANYCHAT_API_KEY}`,
+      Authorization: `Bearer ${process.env.MANYCHAT_API_KEY}`,
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
+      Accept: 'application/json',
     },
-    body: JSON.stringify({
-      subscriber_id: Number(subscriberId),
-      data,
-    }),
+    body: JSON.stringify(payload),
   });
 
   const text = await response.text();
+
+  console.log('ManyChat status:', response.status);
+  console.log('ManyChat body:', text);
 
   if (!response.ok) {
     throw new Error(`ManyChat API error ${response.status}: ${text}`);
   }
 
-  console.log('ManyChat sendContent OK:', text);
   return text;
 }
 
@@ -124,7 +138,6 @@ app.post('/stencil', async (req, res) => {
     return res.json({
       version: 'v2',
       content: {
-        type: 'instagram',
         messages: [
           { type: 'text', text: t.blocked },
           { type: 'text', text: SITE_URL },
@@ -133,11 +146,10 @@ app.post('/stencil', async (req, res) => {
     });
   }
 
-  // RESPUESTA RAPIDA PARA EVITAR TIMEOUT EN MANYCHAT
+  // Respuesta rápida para evitar timeout en ManyChat
   res.json({
     version: 'v2',
     content: {
-      type: 'instagram',
       messages: [
         {
           type: 'text',
@@ -147,12 +159,13 @@ app.post('/stencil', async (req, res) => {
     },
   });
 
-  // PROCESO EN SEGUNDO PLANO
+  // Proceso en segundo plano
   setImmediate(async () => {
     try {
       console.log('Inicio procesamiento background para user:', userId);
+      console.log('URL original recibida:', imageUrl);
 
-      // 1) Descargar imagen desde la URL que guardo ManyChat
+      // 1) Descargar la imagen desde la URL de Instagram/ManyChat
       const imgRes = await fetch(imageUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0',
@@ -193,7 +206,7 @@ app.post('/stencil', async (req, res) => {
 
       console.log('Stencil generado:', stencilUrl);
 
-      // 4) Solo contamos el uso cuando SI hubo resultado
+      // 4) Solo contar uso cuando sí hubo imagen
       increment(userId);
       const remaining = LIMIT - getCount(userId);
 
@@ -217,7 +230,6 @@ app.post('/stencil', async (req, res) => {
       await sendManychatContent(userId, {
         version: 'v2',
         content: {
-          type: 'instagram',
           messages: finalMessages,
         },
       });
@@ -230,7 +242,6 @@ app.post('/stencil', async (req, res) => {
         await sendManychatContent(userId, {
           version: 'v2',
           content: {
-            type: 'instagram',
             messages: [
               {
                 type: 'text',
@@ -247,4 +258,4 @@ app.post('/stencil', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));;
