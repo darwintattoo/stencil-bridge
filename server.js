@@ -25,7 +25,7 @@ const LORA_URL =
 const PROMPT =
   'Convert this image into a clean black and white tattoo stencil line art. Use bold, precise outlines with fine detail preservation. Style: fluxdarwinupc';
 
-const LIMIT = 999;
+const LIMIT = 3;
 const SITE_URL = 'https://stencil.tattoostencilpro.app';
 
 const MESSAGES = {
