@@ -30,24 +30,20 @@ const SITE_URL = 'https://stencil.tattoostencilpro.app';
 
 const MESSAGES = {
   es: {
-    blocked:
-      'Ya usaste tus 2 stencils gratuitos. Para generar ilimitados registrate en nuestra plataforma, es rapido y gratis para empezar.',
-    error: 'Hubo un problema procesando tu imagen. Intentalo de nuevo con otra foto.',
+    blocked: 'You used your 2 free stencils. / Ya usaste tus 2 stencils gratis.',
+    error: 'Could not process image. / No se pudo procesar la imagen.',
   },
   en: {
-    blocked:
-      "You have used your 2 free stencils. Sign up on our platform to generate unlimited ones — it's free to get started.",
-    error: 'There was a problem processing your image. Please try again with another photo.',
+    blocked: 'You used your 2 free stencils. / Ya usaste tus 2 stencils gratis.',
+    error: 'Could not process image. / No se pudo procesar la imagen.',
   },
   pt: {
-    blocked:
-      'Voce ja usou seus 2 stencils gratuitos. Cadastre-se para gerar ilimitados — e gratis para comecar.',
-    error: 'Houve um problema ao processar sua imagem. Tente novamente com outra foto.',
+    blocked: 'You used your 2 free stencils. / Ya usaste tus 2 stencils gratis.',
+    error: 'Could not process image. / No se pudo procesar la imagen.',
   },
   fr: {
-    blocked:
-      "Vous avez utilise vos 2 stencils gratuits. Inscrivez-vous pour en generer a l'infini — c'est gratuit.",
-    error: 'Une erreur sest produite. Veuillez reessayer avec une autre photo.',
+    blocked: 'You used your 2 free stencils. / Ya usaste tus 2 stencils gratis.',
+    error: 'Could not process image. / No se pudo procesar la imagen.',
   },
 };
 
