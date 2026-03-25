@@ -17,39 +17,38 @@ db.exec(`
 `);
 
 const LORA_URL = 'https://v3b.fal.media/files/b/0a919f3f/3sH9dV22IiRUQAaoQyP55_pytorch_lora_weights.safetensors';
-const PROMPT   = 'Convert this image into a clean black and white tattoo stencil line art. Use bold, precise outlines with fine detail preservation. Style: fluxdarwinupc';
-const LIMIT    = 2;
+const PROMPT = 'Convert this image into a clean black and white tattoo stencil line art. Use bold, precise outlines with fine detail preservation. Style: fluxdarwinupc';
+const LIMIT = 2;
 const SITE_URL = 'https://stencil.tattoostencilpro.app';
 
-// ── Mensajes por idioma ─────────────────────────────────────────────────────
 const MESSAGES = {
   es: {
     remaining: (n) => `Aqui esta tu stencil! Te queda ${n} generacion gratuita.`,
-    last:           `Aqui esta tu stencil! Has usado tus 2 generaciones gratuitas.`,
-    upsell:         `Para generar ilimitados registrate aqui, es gratis para empezar:`,
-    blocked:        `Ya usaste tus 2 stencils gratuitos. Para generar ilimitados registrate en nuestra plataforma, es rapido y gratis para empezar.`,
-    error:          `Hubo un problema procesando tu imagen. Intentalo de nuevo con otra foto.`,
+    last: `Aqui esta tu stencil! Has usado tus 2 generaciones gratuitas.`,
+    upsell: `Para generar ilimitados registrate aqui, es gratis para empezar:`,
+    blocked: `Ya usaste tus 2 stencils gratuitos. Para generar ilimitados registrate en nuestra plataforma, es rapido y gratis para empezar.`,
+    error: `Hubo un problema procesando tu imagen. Intentalo de nuevo con otra foto.`,
   },
   en: {
     remaining: (n) => `Here is your stencil! You have ${n} free generation left.`,
-    last:           `Here is your stencil! You have used your 2 free generations.`,
-    upsell:         `To generate unlimited stencils, sign up here — it's free to get started:`,
-    blocked:        `You have used your 2 free stencils. Sign up on our platform to generate unlimited ones — it's free to get started.`,
-    error:          `There was a problem processing your image. Please try again with another photo.`,
+    last: `Here is your stencil! You have used your 2 free generations.`,
+    upsell: `To generate unlimited stencils, sign up here — it's free to get started:`,
+    blocked: `You have used your 2 free stencils. Sign up on our platform to generate unlimited ones — it's free to get started.`,
+    error: `There was a problem processing your image. Please try again with another photo.`,
   },
   pt: {
     remaining: (n) => `Aqui esta o seu stencil! Voce tem ${n} geracao gratuita restante.`,
-    last:           `Aqui esta o seu stencil! Voce usou suas 2 geracoes gratuitas.`,
-    upsell:         `Para gerar ilimitados, cadastre-se aqui — e gratis para comecar:`,
-    blocked:        `Voce ja usou seus 2 stencils gratuitos. Cadastre-se para gerar ilimitados — e gratis para comecar.`,
-    error:          `Houve um problema ao processar sua imagem. Tente novamente com outra foto.`,
+    last: `Aqui esta o seu stencil! Voce usou suas 2 geracoes gratuitas.`,
+    upsell: `Para gerar ilimitados, cadastre-se aqui — e gratis para comecar:`,
+    blocked: `Voce ja usou seus 2 stencils gratuitos. Cadastre-se para gerar ilimitados — e gratis para comecar.`,
+    error: `Houve um problema ao processar sua imagem. Tente novamente com outra foto.`,
   },
   fr: {
     remaining: (n) => `Voici votre stencil ! Il vous reste ${n} generation gratuite.`,
-    last:           `Voici votre stencil ! Vous avez utilise vos 2 generations gratuites.`,
-    upsell:         `Pour generer des stencils illimites, inscrivez-vous ici — c'est gratuit :`,
-    blocked:        `Vous avez utilise vos 2 stencils gratuits. Inscrivez-vous pour en generer a l'infini — c'est gratuit.`,
-    error:          `Une erreur s'est produite. Veuillez reessayer avec une autre photo.`,
+    last: `Voici votre stencil ! Vous avez utilise vos 2 generations gratuites.`,
+    upsell: `Pour generer des stencils illimites, inscrivez-vous ici — c'est gratuit :`,
+    blocked: `Vous avez utilise vos 2 stencils gratuits. Inscrivez-vous pour en generer a l'infini — c'est gratuit.`,
+    error: `Une erreur s'est produite. Veuillez reessayer avec une autre photo.`,
   },
 };
 
@@ -59,7 +58,6 @@ function getLang(locale) {
   return MESSAGES[code] ? code : 'en';
 }
 
-// ── Helpers DB ───────────────────────────────────────────────────────────────
 function getCount(userId) {
   const row = db.prepare('SELECT count FROM users WHERE user_id = ?').get(userId);
   return row ? row.count : 0;
@@ -72,21 +70,19 @@ function increment(userId) {
   `).run(userId);
 }
 
-// ── Endpoint principal ───────────────────────────────────────────────────────
 app.post('/stencil', async (req, res) => {
   const imageUrl = req.body.image_url;
-  const userId   = req.body.user_id;    // {{contact.id}} en ManyChat
-  const locale   = req.body.locale;     // {{contact.locale}} en ManyChat
+  const userId = req.body.user_id;
+  const locale = req.body.locale;
 
   if (!imageUrl || !userId) {
     return res.status(400).json({ error: 'image_url y user_id son requeridos' });
   }
 
   const lang = getLang(locale);
-  const t    = MESSAGES[lang];
+  const t = MESSAGES[lang];
   const count = getCount(userId);
 
-  // Limite alcanzado
   if (count >= LIMIT) {
     return res.json({
       version: 'v2',
@@ -100,18 +96,43 @@ app.post('/stencil', async (req, res) => {
   }
 
   try {
-    const result = await fal.subscribe('fal-ai/flux-2/lora/edit', {
-      input: {
-        image_url: imageUrl,
-        prompt: PROMPT,
-        loras: [{ path: LORA_URL, scale: 1.0 }],
-        num_inference_steps: 30,
-        guidance_scale: 7.5,
+    // 1) Descargar la imagen que llega desde Instagram / ManyChat
+    const imgRes = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
       },
-      logs: false,
     });
 
-    const stencilUrl = result.data.images[0].url;
+    if (!imgRes.ok) {
+      throw new Error(`No se pudo descargar la imagen original: ${imgRes.status}`);
+    }
+
+    const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+    const arrayBuffer = await imgRes.arrayBuffer();
+    const blob = new Blob([arrayBuffer], { type: contentType });
+
+    // 2) Subir esa imagen a fal storage
+    const safeImageUrl = await fal.storage.upload(blob);
+
+    // 3) Llamar al modelo con el formato correcto
+    const result = await fal.subscribe('fal-ai/flux-2/lora/edit', {
+      input: {
+        prompt: PROMPT,
+        image_urls: [safeImageUrl],
+        loras: [{ path: LORA_URL, scale: 1.0 }],
+        num_inference_steps: 30,
+        guidance_scale: 2.5,
+        enable_safety_checker: false,
+        output_format: 'png',
+      },
+      logs: true,
+    });
+
+    const stencilUrl = result?.data?.images?.[0]?.url;
+
+    if (!stencilUrl) {
+      throw new Error('fal no devolvio imagen');
+    }
 
     increment(userId);
     const remaining = LIMIT - getCount(userId);
@@ -132,11 +153,16 @@ app.post('/stencil', async (req, res) => {
       messages.push({ type: 'text', text: SITE_URL });
     }
 
-    res.json({ version: 'v2', content: { messages } });
-
+    return res.json({
+      version: 'v2',
+      content: { messages },
+    });
   } catch (err) {
-    console.error('Error fal.ai:', err.message);
-    res.json({
+    console.error('Error fal.ai completo:', err);
+    console.error('Mensaje:', err?.message);
+    console.error('Body:', err?.body);
+
+    return res.json({
       version: 'v2',
       content: {
         messages: [{ type: 'text', text: t.error }],
